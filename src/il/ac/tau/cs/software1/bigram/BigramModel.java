@@ -1,5 +1,10 @@
 package il.ac.tau.cs.software1.bigram;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Locale;
 
@@ -79,8 +84,33 @@ public class BigramModel {
      * @post: mBigramCounts = prev(mBigramCounts)
      */
     public String[] buildVocabularyIndex(String fileName) throws IOException { // Question 1
-        // TODO: implement
-        return null;
+
+        File fromFile = new File(fileName);
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(fromFile));
+
+        String[] prepForAnswer = new String[MAX_VOCABULARY_SIZE];
+        String line;
+        String[] tokens;
+        int count = 0;
+
+        while ((line = bufferedReader.readLine()) != null && count < MAX_VOCABULARY_SIZE ) {
+            tokens = line.trim().split("\\s+");
+            for(int i=0 ; i<tokens.length && count < MAX_VOCABULARY_SIZE ; i++){
+                tokens[i] = normalizeWord(tokens[i]);
+                if( tokens[i] != null && findIndex(prepForAnswer, tokens[i]) == -1 ){
+                     prepForAnswer[count] = tokens[i];
+                     count ++;       // count represent how many words are in final ans
+            }
+            }
+        }
+
+        String[] finalAns = new String[count];
+        for(int i=0 ; i<count ; i++){
+            finalAns[i] = prepForAnswer[i];
+        }
+        bufferedReader.close();
+        return finalAns;
+
     }
 
     /*
@@ -88,8 +118,33 @@ public class BigramModel {
      * @post: mBigramCounts = prev(mBigramCounts)
      */
     public int[][] buildCountsArray(String fileName, String[] vocabulary) throws IOException { // Question 2
-        // TODO: implement
-        return null;
+        int[][] ansArray = new int[vocabulary.length][vocabulary.length];
+
+        File fromFile = new File(fileName);
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(fromFile));
+        String line;
+        String[] tokens;
+
+        while ( (line = bufferedReader.readLine()) != null){
+            tokens = line.trim().split("\\s+");     // [a, A, -3, bBb]
+
+            if (tokens.length <= 1) continue;       // nothing to do with a empty or 1-word line
+
+            for(int i=0 ; i<tokens.length ; i++){   // [a, A, -3, bBb] >> goes into >> [a, a, null, bbb]
+                tokens[i] = normalizeWord(tokens[i]);
+            }
+
+            for(int i=0 ; i<tokens.length-1 ; i++){
+                if (tokens[i] == null || tokens[i+1] == null) continue;     // skips over null at tokens array
+                int firstIndex = findIndex(vocabulary, tokens[i]);
+                int secIndex = findIndex(vocabulary, tokens[i+1]);
+                if (firstIndex != (-1) && secIndex != (-1) ){
+                    ansArray[firstIndex][secIndex]++;
+                }
+            }
+        }
+        bufferedReader.close();
+        return ansArray;
     }
 
     /*
@@ -97,14 +152,73 @@ public class BigramModel {
      * @pre: fileName is a legal file path
      */
     public void saveModel(String fileName) throws IOException { // Question 3
-        // TODO: implement
+
+        // String[] mVocabulary  and  int[][] mBigramCounts  had been set
+
+        File toFileVOC = new File(fileName + VOC_FILE_SUFFIX);
+        File toFileCOUNTS = new File(fileName + COUNTS_FILE_SUFFIX);
+
+        BufferedWriter bufferedWriterVOC = new BufferedWriter(new FileWriter(toFileVOC));
+        BufferedWriter bufferedWriterCOUNTS = new BufferedWriter(new FileWriter(toFileCOUNTS));
+
+        bufferedWriterVOC.write(mVocabulary.length + " words" + System.lineSeparator());
+        for(int i=0 ; i<mVocabulary.length ; i++){
+            bufferedWriterVOC.write(i + "," + mVocabulary[i] + System.lineSeparator());
+        }
+
+        for(int i=0 ; i<mBigramCounts.length ; i++){
+            for(int j=0 ; j<mBigramCounts.length ; j++){
+                if(mBigramCounts[i][j] > 0){
+                    bufferedWriterCOUNTS.write(i + "," + j + ":" + mBigramCounts[i][j]+ System.lineSeparator());
+                }
+            }
+        }
+
+        bufferedWriterVOC.close();
+        bufferedWriterCOUNTS.close();
     }
 
     /*
      * @pre: fileName is a legal file path
      */
     public void loadModel(String fileName) throws IOException { // Question 4
-        // TODO: implement
+        File fromFileVOC = new File(fileName + VOC_FILE_SUFFIX);
+        File fromFileCOUNTS = new File(fileName + COUNTS_FILE_SUFFIX);
+
+        BufferedReader bufferedReaderVOC = new BufferedReader(new FileReader(fromFileVOC));
+        BufferedReader bufferedReaderCOUNTS = new BufferedReader(new FileReader(fromFileCOUNTS));
+
+        String line = bufferedReaderVOC.readLine();     // example: "5 words" 
+        String[] firstVocLine = line.split(" ");       // example: [5, words]
+        int vocLength = Integer.parseInt(firstVocLine[0]);
+
+        String[] new_mVocabulary = new String[vocLength];
+        int[][] new_BigramCounts = new int[vocLength][vocLength];
+
+        String[] currentVocLine;                        // will be used to split "line" in the next for loop
+        
+        for (int i=0 ; i<vocLength ; i++){
+            line = bufferedReaderVOC.readLine();
+            currentVocLine = line.split(",", 2);           // example: [1, all]
+            new_mVocabulary[i] = currentVocLine[1];     // inserts relevant word into new_voc
+        }
+
+        String[] currentCOUNTSLine;                        // will be used to split "line" in the next for loop
+
+        while ( (line = bufferedReaderCOUNTS.readLine()) != null){
+            currentCOUNTSLine = line.split("[,:]");
+            int i = Integer.parseInt(currentCOUNTSLine[0]);
+            int j = Integer.parseInt(currentCOUNTSLine[1]);
+            int count = Integer.parseInt(currentCOUNTSLine[2]);
+
+            new_BigramCounts[i][j] = count;
+        }
+
+        mVocabulary = new_mVocabulary;
+        mBigramCounts = new_BigramCounts;
+
+        bufferedReaderVOC.close();
+        bufferedReaderCOUNTS.close();
     }
 
     /*
